@@ -52,6 +52,14 @@ Uniswap协议是由`UNI`代币持有者拥有和管理的公共产品。并且�
 
 - 快速互换（`flash swaps`）功能
      用户可以自由地接收资产并把他们用在链上的其他地方，只要在转账的最后支付（或返还）即可。
+     
+- `Uniswap V2` 的核心合约
+     Uniswap V2 Core
+UniswapV2Pair.sol
+UniswapV2Factory.sol
+Uniswap V2 Periphery
+Router contract
+Library contract
 
 [代码链接地址](https://github.com/Uniswap/v2-core)
 
@@ -120,14 +128,194 @@ Uniswap协议是由`UNI`代币持有者拥有和管理的公共产品。并且�
 ![](./image/u3.png)
 用户直接通过`Uniswap`提供的路由合约（关于路由合约之后介绍）进行路由到`Uniswap V2`,`Uniswap V2`将A代币兑换成了C代币，再用C代币最终兑换成了期望兑换的代币B。间接兑换的好处就是让用户的利益最大化，即能够换取最大数量的(期望兑换货币)B代币。
  
+## 6. 关键功能对应的函数
 
+### 6.1 Uniswap V2
+#### 6.1.1 合约文件名称
 
+    - UniswapV2Router02.sol：路由合约，用于与 Uniswap 流动性池进行交互，提供流动性、移除流动性以及执行代币交换的功能。
+    - UniswapV2Pair.sol：每个流动性池的核心合约，处理代币交换的具体逻辑并管理流动性池的状态。
 
+#### 6.1.2 主要函数
+- `addLiquidity`：向流动性池提供流动性。
 
+```
+function addLiquidity(
+    address tokenA,
+    address tokenB,
+    uint amountADesired,
+    uint amountBDesired,
+    uint amountAMin,
+    uint amountBMin,
+    address to,
+    uint deadline
+) external returns (uint amountA, uint amountB, uint liquidity);
 
+```
 
+- `swapExactTokensForTokens`：进行代币交换。
 
+```
+function swapExactTokensForTokens(
+    uint amountIn,
+    uint amountOutMin,
+    address[] calldata path,
+    address to,
+    uint deadline
+) external returns (uint[] memory amounts);
 
+```
 
+- `removeLiquidity`：移除流动性，并收到两种代币。
+
+```
+function removeLiquidity(
+    address tokenA,
+    address tokenB,
+    uint liquidity,
+    uint amountAMin,
+    uint amountBMin,
+    address to,
+    uint deadline
+) external returns (uint amountA, uint amountB);
+
+```
+
+#### 6.1.3 使用步骤：
+- **部署和导入依赖**：需要部署和使用`Uniswap`的路由合约以及池合约。
+- **实现接口**：调用`UniswapV2Router02`中的`addLiquidity`和`swapExactTokensForTokens`等函数即可完成流动性提供和代币交换。
+- **授权代币**：在进行交易前需要通过`ERC20`的`approve`函数授权`Uniswap`合约使用用户的代币。
+
+示例：
+
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import '@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+
+contract MyUniswapV2 {
+    IUniswapV2Router02 public uniswapRouter;
+    address public tokenA;
+    address public tokenB;
+
+    constructor(address _router, address _tokenA, address _tokenB) {
+        uniswapRouter = IUniswapV2Router02(_router);
+        tokenA = _tokenA;
+        tokenB = _tokenB;
+    }
+
+    function swap(uint256 amountIn) external {
+        // Approve Uniswap Router to spend tokenA
+        IERC20(tokenA).approve(address(uniswapRouter), amountIn);
+
+        address;
+        path[0] = tokenA;
+        path[1] = tokenB;
+
+        // Execute the swap
+        uniswapRouter.swapExactTokensForTokens(
+            amountIn,
+            0, // accept any amountOut
+            path,
+            msg.sender,
+            block.timestamp
+        );
+    }
+}
+
+```
+
+### 6.2 Uniswap V3
+
+#### 6.2.1 合约文件名称
+- `UniswapV3Router.sol`：与`Uniswap V3`流动性池交互的核心路由合约。
+- `NonfungiblePositionManager.sol`：用于管理流动性提供者的头寸`NFT`。
+- `UniswapV3Pool.sol`：每个交易对的流动性池，负责价格计算和流动性管理。
+
+#### 6.2.2  主要函数
+- `mint`：在特定的价格范围内提供流动性
+
+```
+function mint(
+    MintParams calldata params
+) external returns (
+    uint128 liquidity,
+    uint256 amount0,
+    uint256 amount1
+);
+
+```
+
+- `swapExactInputSingle`：单个交易对的代币交换。
+
+```
+function exactInputSingle(
+    ExactInputSingleParams calldata params
+) external payable returns (uint256 amountOut);
+
+```
+- `increaseLiquidity`：在现有流动性头寸上增加流动性。
+
+```
+function increaseLiquidity(
+    IncreaseLiquidityParams calldata params
+) external returns (
+    uint128 liquidity,
+    uint256 amount0,
+    uint256 amount1
+);
+
+```
+
+#### 6.2.3 使用步骤
+
+- **部署和导入依赖**：使用`NonfungiblePositionManager`来管理流动性`NFT`，结合`UniswapV3Router`来进行交易。
+- **实现接口**：调用`mint`、`exactInputSingle` 等函数来管理流动性和执行交易。
+- **授权代币**：同样需要通过`ERC20`的`approve`函数授权`Uniswap`合约使用代币
+
+示例：
+
+```
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+
+contract MyUniswapV3 {
+    ISwapRouter public uniswapRouter;
+    address public tokenA;
+    address public tokenB;
+
+    constructor(address _router, address _tokenA, address _tokenB) {
+        uniswapRouter = ISwapRouter(_router);
+        tokenA = _tokenA;
+        tokenB = _tokenB;
+    }
+
+    function swapExactInputSingle(uint256 amountIn) external {
+        // Approve Uniswap Router to spend tokenA
+        IERC20(tokenA).approve(address(uniswapRouter), amountIn);
+
+        ISwapRouter.ExactInputSingleParams memory params =
+            ISwapRouter.ExactInputSingleParams({
+                tokenIn: tokenA,
+                tokenOut: tokenB,
+                fee: 3000,
+                recipient: msg.sender,
+                deadline: block.timestamp + 15,
+                amountIn: amountIn,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            });
+
+        // Execute the swap
+        uniswapRouter.exactInputSingle(params);
+    }
+}
+
+```
 
 
